@@ -1,0 +1,19 @@
+{
+  "name": "digit-sum-trading-game",
+  "version": "1.0.0",
+  "description": "Multiplayer educational simulator recreating the experience and gameplay of the currency note digit-sum trading game.",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"magenta,cyan\" \"npm run dev:server\" \"npm run dev:client\"",
+    "build:client": "npm run build --prefix client",
+    "test:server": "npm test --prefix server",
+    "start": "node server/src/index.js",
+    "build": "npm run build:client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

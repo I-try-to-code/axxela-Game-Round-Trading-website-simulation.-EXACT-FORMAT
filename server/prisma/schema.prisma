@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model GameRoom {
+  id             String      @id @default(uuid())
+  code           String      @unique
+  hostId         String
+  status         String      @default("LOBBY") // LOBBY, IN_PROGRESS, FINISHED
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  games          Game[]
+}
+
+model Game {
+  id                     String          @id @default(uuid())
+  roomId                 String
+  room                   GameRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  status                 String          @default("WAITING") // WAITING, INSTRUCTIONS, TRADING, ROUND_TRANSITION, SETTLEMENT, FINISHED
+  currentRound           Int             @default(1)
+  roundDurationSeconds   Int             @default(90)
+  hiddenDigits           String          // Server-only: "5,7,2,4,1,8"
+  revealedDigits         String          @default("") // Client-accessible: "5,7"
+  finalSettlementSum     Int?
+  isPracticeMode         Boolean         @default(false)
+  isDeterministicDemo    Boolean         @default(false)
+  createdAt              DateTime        @default(now())
+  endedAt                DateTime?
+
+  players                Player[]
+  rounds                 Round[]
+  proposals              TradeProposal[]
+  trades                 Trade[]
+  positions              Position[]
+  pnlRecords             PnlRecord[]
+  events                 GameEvent[]
+}
+
+model Player {
+  id               String          @id @default(uuid())
+  gameId           String
+  game             Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  letter           String          // A, B, C, D, E, F
+  nickname         String
+  isBot            Boolean         @default(false)
+  botType          String?         // RANDOM, FAIR_VALUE, CONSERVATIVE, AGGRESSIVE, MARKET_PLAYER
+  socketId         String?
+  connected        Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+
+  proposalsSent     TradeProposal[] @relation("ProposalsSent")
+  proposalsReceived TradeProposal[] @relation("ProposalsReceived")
+  tradesBought      Trade[]         @relation("TradesBought")
+  tradesSold        Trade[]         @relation("TradesSold")
+  positions         Position[]
+  pnlRecords        PnlRecord[]
+}
+
+model Round {
+  id            String    @id @default(uuid())
+  gameId        String
+  game          Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  roundNumber   Int
+  revealedDigit Int?
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+}
+
+model TradeProposal {
+  id           String    @id @default(uuid())
+  gameId       String
+  game         Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  round        Int
+  fromPlayerId String
+  fromPlayer   Player    @relation("ProposalsSent", fields: [fromPlayerId], references: [id], onDelete: Cascade)
+  toPlayerId   String
+  toPlayer     Player    @relation("ProposalsReceived", fields: [toPlayerId], references: [id], onDelete: Cascade)
+  side         String    // BUY, SELL
+  price        Float
+  quantity     Int       @default(1)
+  status       String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, CANCELLED, EXPIRED
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime?
+}
+
+model Trade {
+  id             String    @id @default(uuid())
+  gameId         String
+  game           Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  round          Int
+  buyerPlayerId  String
+  buyer          Player    @relation("TradesBought", fields: [buyerPlayerId], references: [id], onDelete: Cascade)
+  sellerPlayerId String
+  seller         Player    @relation("TradesSold", fields: [sellerPlayerId], references: [id], onDelete: Cascade)
+  price          Float
+  quantity       Int       @default(1)
+  createdAt      DateTime  @default(now())
+}
+
+model Position {
+  id           String    @id @default(uuid())
+  gameId       String
+  game         Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  playerId     String
+  player       Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  currentUnits Int       @default(0) // -2 to +2
+  averageCost  Float     @default(0)
+  updatedAt    DateTime  @updatedAt
+}
+
+model PnlRecord {
+  id            String    @id @default(uuid())
+  gameId        String
+  game          Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  playerId      String
+  player        Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  realizedPnl   Float     @default(0)
+  settlementPnl Float     @default(0)
+  finalPnl      Float     @default(0)
+  rank          Int?
+  updatedAt     DateTime  @updatedAt
+}
+
+model GameEvent {
+  id        String   @id @default(uuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  round     Int
+  eventType String   // ROUND_START, DIGIT_REVEAL, PROPOSAL, TRADE_EXECUTED, POSITION_UPDATE, SETTLEMENT
+  eventData String   // JSON payload string
+  createdAt DateTime @default(now())
+}
